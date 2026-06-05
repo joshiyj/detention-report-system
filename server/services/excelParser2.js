@@ -1,18 +1,23 @@
 /**
- * excelParser.js
- * Parses the RBU attendance Excel sheet.
+ * excelParser2.js
+ * Parses 2nd Year (4th Semester) RBU attendance Excel sheets.
  *
- * Excel structure quirks:
- *  - Each student may span 2-3 rows (due to "pouring attendance" merged cells)
- *  - Empty rows separate students
- *  - Attendance values: "10 / 24 ( 41.67 % )" OR "pouring Attendance :28.0/ 33 (84.85)"
- *  - Overall attendance: "134/256 (52.34)"
- *  - Some cells may be NaN / undefined
+ * Column structure:
+ *   Col 0: Roll No       (e.g. "O1_1")
+ *   Col 1: Student Name
+ *   Col 2: Overall Attendance  (e.g. "198/248 (79.84%)")
+ *   Col 3..N: Subject columns  (ESD, ESD Lab, OS, OS Lab, DAA, AIML, AIML Lab, ...)
+ *
+ * Differences from 1st year parser:
+ *   - No "Unique Id" column (col 1 = student name directly)
+ *   - No "Seat No" column (rollNo is used as the unique key)
+ *   - Overall attendance format: "198/248 (79.84%)" — note the "%" inside parens
+ *   - Subject values same format: "32 / 34 (94.12%)" or pouring Attendance lines
  */
 
 const XLSX = require('xlsx');
 
-// Regex to extract percentage from various formats
+// Regex: extract the numeric percentage from "(79.84%)" or "(79.84)"
 const PCT_REGEX = /\(\s*([\d.]+)\s*%?\s*\)/;
 
 function extractPct(val) {
@@ -21,7 +26,6 @@ function extractPct(val) {
   if (!s || s === 'NaN') return null;
   const m = s.match(PCT_REGEX);
   if (m) return parseFloat(m[1]);
-  // plain number fallback
   const n = parseFloat(s);
   return isNaN(n) ? null : n;
 }
@@ -29,33 +33,35 @@ function extractPct(val) {
 function extractOverallPct(val) {
   if (!val) return null;
   const s = String(val).trim();
-  // Format: "134/256 (52.34)"
-  const m = s.match(/\((\s*[\d.]+\s*)\)/);
+  // Handles: "198/248 (79.84%)" or "198/248 (79.84)"
+  const m = s.match(/\(\s*([\d.]+)\s*%?\s*\)/);
   if (m) return parseFloat(m[1]);
   return null;
 }
 
 /**
- * Parse the Excel file buffer and return normalized student records.
+ * Parse a 2nd year Excel file buffer.
  * @param {Buffer} buffer
- * @returns {{ headers: string[], students: StudentRecord[] }}
+ * @returns {{ subjectNames: string[], students: StudentRecord[] }}
  */
-function parseExcel(buffer) {
+function parseExcel2(buffer) {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];
   const ws = workbook.Sheets[sheetName];
 
-  // Read as array of arrays (raw, no header inference)
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: false });
 
   if (raw.length < 2) throw new Error('Excel file appears empty or has no data rows.');
 
-  // Row 0 is header
+  // Row 0 = header
   const headerRow = raw[0].map(h => (h ? String(h).trim() : ''));
 
-  // Subject columns: everything after col 4 (index 4 = OverAll Attendance)
-  // Cols: 0=Roll No, 1=Unique Id, 2=Seat No, 3=Student name, 4=OverAll, 5..N = subjects
-  const subjectCols = headerRow.slice(5).map((name, i) => ({ name: name || `Subject_${i}`, colIdx: i + 5 }));
+  // Col 0 = Roll No, Col 1 = Student Name, Col 2 = Overall Attendance
+  // Col 3+ = subject columns
+  const subjectCols = headerRow.slice(3).map((name, i) => ({
+    name: name || `Subject_${i}`,
+    colIdx: i + 3,
+  }));
 
   const students = [];
   let i = 1; // start after header
@@ -72,25 +78,24 @@ function parseExcel(buffer) {
     const rollNo = row[0] ? String(row[0]).trim() : null;
     if (!rollNo) { i++; continue; }
 
-    const seatNo = row[2] ? String(row[2]).trim() : '';
-    const name   = row[3] ? String(row[3]).trim() : '';
-    const div    = rollNo.split('_')[0] || ''; // e.g. "O3"
-    const overallPct = extractOverallPct(row[4]);
+    const name        = row[1] ? String(row[1]).trim() : '';
+    const seatNo      = '';   // 2nd year sheets have no Seat No column; use empty
+    const div         = rollNo.split('_')[0] || ''; // e.g. "O1", "O2"
+    const overallPct  = extractOverallPct(row[2]);
 
-    // Build subject attendance map – may span multiple rows
-    // Collect rows belonging to this student (until next non-empty Roll No or end)
+    // Collect all rows belonging to this student
+    // (multiple rows possible due to "pouring Attendance" merged cells)
     const studentRows = [row];
     let j = i + 1;
     while (j < raw.length) {
       const nr = raw[j];
       if (!nr || nr.every(c => !c || String(c).trim() === '')) { j++; continue; }
-      // If next row has a Roll No value, it's a new student
-      if (nr[0] && String(nr[0]).trim()) break;
+      if (nr[0] && String(nr[0]).trim()) break; // new student starts
       studentRows.push(nr);
       j++;
     }
 
-    // Detect "pouring Attendance" in any subject cell across all rows for this student
+    // Detect "pouring Attendance" across all rows for this student
     let hasPouringAttendance = false;
     for (const sr of studentRows) {
       for (const sc of subjectCols) {
@@ -103,8 +108,7 @@ function parseExcel(buffer) {
       if (hasPouringAttendance) break;
     }
 
-    // Merge subject attendance across all rows for this student
-    // Use highest-quality value per column (prefer non-null, non-pouring first row; then pouring rows)
+    // Merge subject attendance across all rows (first non-null wins per column)
     const subjectAttendance = {};
     for (const sc of subjectCols) {
       let bestPct = null;
@@ -112,10 +116,10 @@ function parseExcel(buffer) {
         const pct = extractPct(sr[sc.colIdx]);
         if (pct !== null) {
           bestPct = pct;
-          break; // first non-null wins (primary row preferred)
+          break; // primary row preferred
         }
       }
-      // If still null, try 2nd row entries (merged pouring cells)
+      // Fallback: try subsequent rows (pouring attendance rows)
       if (bestPct === null && studentRows.length > 1) {
         for (const sr of studentRows.slice(1)) {
           const pct = extractPct(sr[sc.colIdx]);
@@ -131,15 +135,14 @@ function parseExcel(buffer) {
       name,
       div,
       overallPct,
-      overallRaw: row[4] ? String(row[4]).trim() : null,
       hasPouringAttendance,
       subjects: subjectAttendance,
     });
 
-    i = j; // advance past this student's rows
+    i = j;
   }
 
   return { subjectNames: subjectCols.map(s => s.name), students };
 }
 
-module.exports = { parseExcel };
+module.exports = { parseExcel2 };

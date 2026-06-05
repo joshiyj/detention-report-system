@@ -1,22 +1,22 @@
 /**
- * wordGenerator.js
- * Generates the RBU Detention List .docx using the docx npm package.
- * Matches the official RBU format as closely as possible.
+ * wordGenerator2.js
+ * Generates the 2nd Year (4th Semester) RBU Detention List .docx.
+ * Matches the reference document format (23_04_26_IV SEM 25-26 FINAL 10_37AM.docx).
+ *
+ * Table III(A) columns: SN | Course Code | Course Name | Sec/Div. | Exam Seat No | Name | Attendance (%)
+ * Table III(B) columns: SN | Sec/Div | Exam Seat No | Name | Overall Att (%) | Course Code | Course Name | Attendance (%)
  */
 
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   AlignmentType, BorderStyle, WidthType, ShadingType, VerticalAlign,
-  HeadingLevel, PageOrientation, UnderlineType, VerticalMergeType,
+  VerticalMergeType,
 } = require('docx');
 const fs = require('fs');
 
-// ── Shared border styles ──────────────────────────────────────────────────────
-const BORDER = { style: BorderStyle.SINGLE, size: 6, color: '000000' };
+// ── Border styles ─────────────────────────────────────────────────────────────
+const BORDER     = { style: BorderStyle.SINGLE, size: 6, color: '000000' };
 const ALL_BORDERS = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
-
-const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
-const NO_BORDERS = { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER };
 
 // ── Typography helpers ────────────────────────────────────────────────────────
 const bold   = (text, size = 20) => new TextRun({ text, bold: true,  size, font: 'Times New Roman' });
@@ -31,7 +31,15 @@ function centerPara(children, spacingAfter = 80) {
   return para(children, AlignmentType.CENTER, spacingAfter);
 }
 
-// ── Table cell builders ───────────────────────────────────────────────────────
+function sectionHeading(text) {
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 200, after: 100 },
+    children: [bold(text, 22)],
+  });
+}
+
+// ── Cell builders ─────────────────────────────────────────────────────────────
 function headerCell(text, width, colSpan = 1, rowSpan = 1) {
   return new TableCell({
     borders: ALL_BORDERS,
@@ -62,49 +70,33 @@ function dataCell(text, width, alignment = AlignmentType.CENTER, verticalMerge =
   });
 }
 
-function emptyCell(width, verticalMerge = undefined) {
-  return dataCell('', width, AlignmentType.CENTER, verticalMerge);
-}
-
-// ── Section heading ───────────────────────────────────────────────────────────
-function sectionHeading(text) {
-  return new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 200, after: 100 },
-    children: [bold(text, 22)],
-  });
-}
-
 // ── Table I ───────────────────────────────────────────────────────────────────
-// Cols: Roll No. | Seat No | Student name | Aggregate Attendance %
-// Total width = 9026 DXA (A4 with ~1" margins)
-const T1_WIDTHS = [1126, 1800, 3900, 2200]; // sum = 9026
+// Cols: Exam Seat No | Name | Aggregate Attendance %
+// For 2nd year, Seat No may be empty — use Roll No instead
+const T1_WIDTHS = [1500, 4526, 3000]; // sum = 9026
 
-function buildTableI(rows) {
+function buildTableI2(rows) {
   const headerRow = new TableRow({
     tableHeader: true,
     children: [
-      headerCell('Roll No.',              T1_WIDTHS[0]),
-      headerCell('Seat No',               T1_WIDTHS[1]),
-      headerCell('Student name',          T1_WIDTHS[2]),
-      headerCell('Aggregate Attendance %',T1_WIDTHS[3]),
+      headerCell('Exam Seat No',            T1_WIDTHS[0]),
+      headerCell('Name',                    T1_WIDTHS[1]),
+      headerCell('Aggregate Attendance %',  T1_WIDTHS[2]),
     ],
   });
 
   const dataRows = rows.length > 0
     ? rows.map(r => new TableRow({
         children: [
-          dataCell(r.rollNo  ?? '',        T1_WIDTHS[0]),
-          dataCell(r.seatNo  ?? '',        T1_WIDTHS[1]),
-          dataCell(r.name    ?? '',        T1_WIDTHS[2], AlignmentType.LEFT),
-          dataCell(r.overall ?? '',        T1_WIDTHS[3]),
+          dataCell(r.seatNo || r.rollNo || '', T1_WIDTHS[0]),
+          dataCell(r.name   ?? '',              T1_WIDTHS[1], AlignmentType.LEFT),
+          dataCell(r.overall ?? '',             T1_WIDTHS[2]),
         ],
       }))
     : [new TableRow({ children: [
         dataCell('—',           T1_WIDTHS[0]),
-        dataCell('—',           T1_WIDTHS[1]),
-        dataCell('No students', T1_WIDTHS[2], AlignmentType.LEFT),
-        dataCell('—',           T1_WIDTHS[3]),
+        dataCell('No students', T1_WIDTHS[1], AlignmentType.LEFT),
+        dataCell('—',           T1_WIDTHS[2]),
       ] })];
 
   return new Table({
@@ -115,79 +107,34 @@ function buildTableI(rows) {
 }
 
 // ── Table II ──────────────────────────────────────────────────────────────────
-// Cols: Roll No. | Seat No | Student name | Aggregate Attendance %
-const T2_WIDTHS = [1126, 1800, 3900, 2200]; // sum = 9026
+function buildTableII2(rows) {
+  return buildTableI2(rows); // identical columns for 2nd year
+}
 
-function buildTableII(rows) {
+// ── Table III(A) – Course wise ────────────────────────────────────────────────
+// Cols: SN | Course Code | Course Name | Sec/Div. | Exam Seat No | Name | Attendance (%)
+// (No "Type" column in 2nd year reference doc)
+const T3A_SN   = 500;
+const T3A_CODE = 1500;
+const T3A_NAME = 2000;
+const T3A_DIV  = 800;
+const T3A_SEAT = 1500;
+const T3A_STU  = 1726;
+const T3A_ATT  = 1000;
+// sum = 500+1500+2000+800+1500+1726+1000 = 9026
+const T3A_WIDTHS = [T3A_SN, T3A_CODE, T3A_NAME, T3A_DIV, T3A_SEAT, T3A_STU, T3A_ATT];
+
+function buildTableIIIA2(courses) {
   const headerRow = new TableRow({
     tableHeader: true,
     children: [
-      headerCell('Roll No.',              T2_WIDTHS[0]),
-      headerCell('Seat No',               T2_WIDTHS[1]),
-      headerCell('Student name',          T2_WIDTHS[2]),
-      headerCell('Aggregate Attendance %',T2_WIDTHS[3]),
-    ],
-  });
-
-  const dataRows = rows.length > 0
-    ? rows.map(r => new TableRow({
-        children: [
-          dataCell(r.rollNo  ?? '',        T2_WIDTHS[0]),
-          dataCell(r.seatNo  ?? '',        T2_WIDTHS[1]),
-          dataCell(r.name    ?? '',        T2_WIDTHS[2], AlignmentType.LEFT),
-          dataCell(r.overall ?? '',        T2_WIDTHS[3]),
-        ],
-      }))
-    : [new TableRow({ children: [
-        dataCell('—',           T2_WIDTHS[0]),
-        dataCell('—',           T2_WIDTHS[1]),
-        dataCell('No students', T2_WIDTHS[2], AlignmentType.LEFT),
-        dataCell('—',           T2_WIDTHS[3]),
-      ] })];
-
-  return new Table({
-    width: { size: 9026, type: WidthType.DXA },
-    columnWidths: T2_WIDTHS,
-    rows: [headerRow, ...dataRows],
-  });
-}
-
-// ── Table III(A) – Course wise ────────────────────────────────────────────────────
-// Cols: SN | Course Code | Course Name | Type | Sec/Div. | Exam Seat No | Name | Attendance (%)
-// Two-row header: first row has merged "Student Details" spanning cols 5-8
-const T3A_SN   = 400;
-const T3A_CODE = 1300;
-const T3A_NAME = 1900;
-const T3A_TYPE = 900;
-const T3A_DIV  = 700;
-const T3A_SEAT = 1400;
-const T3A_STU  = 1626;
-const T3A_ATT  = 800;
-// sum = 400+1300+1900+900+700+1400+1626+800 = 9026
-const T3A_WIDTHS = [T3A_SN, T3A_CODE, T3A_NAME, T3A_TYPE, T3A_DIV, T3A_SEAT, T3A_STU, T3A_ATT];
-
-function buildTableIIIA(courses) {
-  // Header row 1: SN | Course Code | Course Name | Student Details (span 4)
-  const studentDetailsWidth = T3A_TYPE + T3A_DIV + T3A_SEAT + T3A_STU + T3A_ATT;
-  const hRow1 = new TableRow({
-    tableHeader: true,
-    children: [
-      headerCell('SN',              T3A_SN,   1, 2),
-      headerCell('Course Code',     T3A_CODE, 1, 2),
-      headerCell('Course Name',     T3A_NAME, 1, 2),
-      headerCell('Student Details', studentDetailsWidth, 5, 1),
-    ],
-  });
-
-  // Header row 2: Type | Sec/Div. | Exam Seat No | Name | Attendance (%)
-  const hRow2 = new TableRow({
-    tableHeader: true,
-    children: [
-      headerCell('Type',           T3A_TYPE),
-      headerCell('Sec/Div.',       T3A_DIV),
-      headerCell('Exam Seat No',   T3A_SEAT),
-      headerCell('Name',           T3A_STU),
-      headerCell('Attendance (%)', T3A_ATT),
+      headerCell('SN',              T3A_SN),
+      headerCell('Course Code',     T3A_CODE),
+      headerCell('Course Name',     T3A_NAME),
+      headerCell('Sec/Div.',        T3A_DIV),
+      headerCell('Exam Seat No',    T3A_SEAT),
+      headerCell('Name',            T3A_STU),
+      headerCell('Attendance (%)',  T3A_ATT),
     ],
   });
 
@@ -196,7 +143,9 @@ function buildTableIIIA(courses) {
     dataRows.push(new TableRow({
       children: [
         dataCell('—', T3A_SN),
-        dataCell('No detained students', T3A_CODE + T3A_NAME + T3A_TYPE + T3A_DIV + T3A_SEAT + T3A_STU + T3A_ATT, AlignmentType.LEFT),
+        dataCell('No detained students',
+          T3A_CODE + T3A_NAME + T3A_DIV + T3A_SEAT + T3A_STU + T3A_ATT,
+          AlignmentType.LEFT),
       ],
     }));
   } else {
@@ -209,14 +158,13 @@ function buildTableIIIA(courses) {
 
         dataRows.push(new TableRow({
           children: [
-            dataCell(idx === 0 ? String(sn) : '',   T3A_SN,   AlignmentType.CENTER, vMerge),
-            dataCell(idx === 0 ? c.code : '',       T3A_CODE, AlignmentType.CENTER, vMerge),
-            dataCell(idx === 0 ? c.fullName : '',   T3A_NAME, AlignmentType.LEFT,   vMerge),
-            dataCell(r.type,    T3A_TYPE),
-            dataCell(r.rollNo,  T3A_DIV),
-            dataCell(r.seatNo,  T3A_SEAT),
-            dataCell(r.name,    T3A_STU, AlignmentType.LEFT),
-            dataCell(r.pct,        T3A_ATT),
+            dataCell(idx === 0 ? String(sn) : '',     T3A_SN,   AlignmentType.CENTER, vMerge),
+            dataCell(idx === 0 ? c.code : '',         T3A_CODE, AlignmentType.CENTER, vMerge),
+            dataCell(idx === 0 ? c.fullName : '',     T3A_NAME, AlignmentType.LEFT,   vMerge),
+            dataCell(r.div    ?? '',                  T3A_DIV),
+            dataCell(r.seatNo || r.rollNo || '',      T3A_SEAT),
+            dataCell(r.name   ?? '',                  T3A_STU,  AlignmentType.LEFT),
+            dataCell(r.pct    ?? '',                  T3A_ATT),
           ],
         }));
       });
@@ -227,44 +175,44 @@ function buildTableIIIA(courses) {
   return new Table({
     width: { size: 9026, type: WidthType.DXA },
     columnWidths: T3A_WIDTHS,
-    rows: [hRow1, hRow2, ...dataRows],
+    rows: [headerRow, ...dataRows],
   });
 }
 
-// ── Table III(B) – Student wise ─────────────────────────────────────────────────────────
-// SN | Sec/Div | Exam Seat No | Name | Overall Att | Course Code | Course Name | Type | Attendance
-const T3B_SN      = 300;
-const T3B_DIV     = 600;
-const T3B_SEAT    = 1300;
+// ── Table III(B) – Student wise ───────────────────────────────────────────────
+// Cols: SN | Sec/Div | Exam Seat No | Name | Overall Att (%) | Course Code | Course Name | Attendance (%)
+const T3B_SN      = 500;
+const T3B_DIV     = 700;
+const T3B_SEAT    = 1500;
 const T3B_STUN    = 1600;
 const T3B_OVERALL = 800;
-const T3B_CODE    = 1100;
-const T3B_CNAME   = 1626; // adjusted so total = 9026
-const T3B_TYPE    = 700;
+const T3B_CODE    = 1300;
+const T3B_CNAME   = 1626;
 const T3B_ATT     = 1000;
-// sum = 300+600+1300+1600+800+1100+1626+700+1000 = 9026
-const T3B_WIDTHS = [T3B_SN, T3B_DIV, T3B_SEAT, T3B_STUN, T3B_OVERALL, T3B_CODE, T3B_CNAME, T3B_TYPE, T3B_ATT];
+// sum = 500+700+1500+1600+800+1300+1626+1000 = 9026
+const T3B_WIDTHS = [T3B_SN, T3B_DIV, T3B_SEAT, T3B_STUN, T3B_OVERALL, T3B_CODE, T3B_CNAME, T3B_ATT];
 
-function buildTableIIIB(studentList) {
+function buildTableIIIB2(studentList) {
   const headerRow = new TableRow({
     tableHeader: true,
     children: [
-      headerCell('SN',                    T3B_SN),
-      headerCell('Sec/Div.',              T3B_DIV),
-      headerCell('Exam Seat No',          T3B_SEAT),
-      headerCell('Name',                  T3B_STUN),
-      headerCell('Overall Attendance',    T3B_OVERALL),
-      headerCell('Course Code',           T3B_CODE),
-      headerCell('Course Name',           T3B_CNAME),
-      headerCell('Type',                  T3B_TYPE),
-      headerCell('Attendance (%)',         T3B_ATT),
+      headerCell('SN',                      T3B_SN),
+      headerCell('Sec/Div.',                T3B_DIV),
+      headerCell('Exam Seat No',            T3B_SEAT),
+      headerCell('Name',                    T3B_STUN),
+      headerCell('Overall Attendance (%)',  T3B_OVERALL),
+      headerCell('Course Code',             T3B_CODE),
+      headerCell('Course Name',             T3B_CNAME),
+      headerCell('Attendance (%)',          T3B_ATT),
     ],
   });
 
   const dataRows = [];
   if (studentList.length === 0) {
     dataRows.push(new TableRow({
-      children: T3B_WIDTHS.map((w, i) => i === 0 ? dataCell('—', w) : dataCell(i === 1 ? 'No detained students' : '', w)),
+      children: T3B_WIDTHS.map((w, i) =>
+        i === 0 ? dataCell('—', w) : dataCell(i === 1 ? 'No detained students' : '', w)
+      ),
     }));
   } else {
     let sn = 1;
@@ -276,15 +224,14 @@ function buildTableIIIB(studentList) {
 
         dataRows.push(new TableRow({
           children: [
-            dataCell(idx === 0 ? String(sn) : '',   T3B_SN,      AlignmentType.CENTER, vMerge),
-            dataCell(idx === 0 ? s.rollNo : '',     T3B_DIV,     AlignmentType.CENTER, vMerge),
-            dataCell(idx === 0 ? s.seatNo : '',     T3B_SEAT,    AlignmentType.CENTER, vMerge),
-            dataCell(idx === 0 ? s.name : '',       T3B_STUN,    AlignmentType.LEFT,   vMerge),
-            dataCell(idx === 0 ? s.overall : '',    T3B_OVERALL, AlignmentType.CENTER, vMerge),
-            dataCell(sub.code,     T3B_CODE),
-            dataCell(sub.fullName, T3B_CNAME, AlignmentType.LEFT),
-            dataCell(sub.type,     T3B_TYPE),
-            dataCell(sub.pct,        T3B_ATT),
+            dataCell(idx === 0 ? String(sn) : '',             T3B_SN,      AlignmentType.CENTER, vMerge),
+            dataCell(idx === 0 ? (s.div || s.rollNo) : '',    T3B_DIV,     AlignmentType.CENTER, vMerge),
+            dataCell(idx === 0 ? (s.seatNo || s.rollNo) : '', T3B_SEAT,    AlignmentType.CENTER, vMerge),
+            dataCell(idx === 0 ? s.name : '',                 T3B_STUN,    AlignmentType.LEFT,   vMerge),
+            dataCell(idx === 0 ? s.overall : '',              T3B_OVERALL, AlignmentType.CENTER, vMerge),
+            dataCell(sub.code     ?? '',                      T3B_CODE),
+            dataCell(sub.fullName ?? '',                      T3B_CNAME,   AlignmentType.LEFT),
+            dataCell(sub.pct      ?? '',                      T3B_ATT),
           ],
         }));
       });
@@ -299,8 +246,8 @@ function buildTableIIIB(studentList) {
   });
 }
 
-// ── Main generator ────────────────────────────────────────────────────────────
-async function generateWord(meta, { tableI, tableII, tableIIIA, tableIIIB }, outputPath) {
+// ── Main Word generator ───────────────────────────────────────────────────────
+async function generateWord2(meta, { tableI, tableII, tableIIIA, tableIIIB }, outputPath) {
   const { examName, schoolName, programme, semester, date } = meta;
 
   const doc = new Document({
@@ -324,7 +271,6 @@ async function generateWord(meta, { tableI, tableII, tableIIIA, tableIIIB }, out
         centerPara([bold(examName, 24)], 40),
         centerPara([normal(`Date: ${date}`, 20)], 80),
 
-        // School / Programme / Semester
         new Paragraph({
           alignment: AlignmentType.LEFT,
           spacing: { after: 40 },
@@ -340,7 +286,6 @@ async function generateWord(meta, { tableI, tableII, tableIIIA, tableIIIB }, out
           ],
         }),
 
-        // Submitted to VC line
         new Paragraph({
           alignment: AlignmentType.LEFT,
           spacing: { after: 160 },
@@ -363,7 +308,7 @@ async function generateWord(meta, { tableI, tableII, tableIIIA, tableIIIB }, out
           ],
         }),
         sectionHeading('Table I'),
-        buildTableI(tableI),
+        buildTableI2(tableI),
         new Paragraph({ spacing: { after: 160 }, children: [] }),
 
         // ── Table II ──────────────────────────────────────────────────────────
@@ -376,23 +321,23 @@ async function generateWord(meta, { tableI, tableII, tableIIIA, tableIIIB }, out
           ],
         }),
         sectionHeading('Table II'),
-        buildTableII(tableII),
+        buildTableII2(tableII),
         new Paragraph({ spacing: { after: 160 }, children: [] }),
 
         // ── Table III(A) ──────────────────────────────────────────────────────
         new Paragraph({
           spacing: { after: 60 },
           children: [
-            normal('Table III is the list of courses along with the student details and the attendance(%) in the courses in which they are recommended to be detained.', 19),
+            normal('Table III is the list of courses along with the student details and the attendance (%) in the courses in which they are recommended to be detained.', 19),
           ],
         }),
-        sectionHeading('Table III (A) – Course wise Detention list'),
-        buildTableIIIA(tableIIIA),
+        sectionHeading('Table III(A) – Course wise Detention list'),
+        buildTableIIIA2(tableIIIA),
         new Paragraph({ spacing: { after: 160 }, children: [] }),
 
         // ── Table III(B) ──────────────────────────────────────────────────────
         sectionHeading('Table III (B) – Student wise Detention list'),
-        buildTableIIIB(tableIIIB),
+        buildTableIIIB2(tableIIIB),
         new Paragraph({ spacing: { after: 240 }, children: [] }),
 
         // ── Signature footer ──────────────────────────────────────────────────
@@ -422,4 +367,4 @@ async function generateWord(meta, { tableI, tableII, tableIIIA, tableIIIB }, out
   return outputPath;
 }
 
-module.exports = { generateWord };
+module.exports = { generateWord2 };

@@ -38,3 +38,8 @@ Thumbs.db
 
 # Project specific generated files
 server/generated/*.docx
+
+# Ignore user sheets, documents, and materials
+sheets and docs/
+materials/
+server/services/saved_mappings.json

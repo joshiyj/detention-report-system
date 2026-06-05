@@ -1,113 +1,131 @@
 # RBU Detention Report Generator
 
-A full-stack MERN web application for Ramdeobaba University that reads an Excel attendance sheet and generates a professionally formatted Word document containing all detention tables.
+A full-stack web application for Ramdeobaba University (RBU) that parses Excel attendance sheets and generates professionally formatted Word documents (`.docx`) containing official university detention tables.
+
+---
 
 ## Features
 
-- Drag-and-drop Excel upload (`.xls` / `.xlsx`)
-- Processes complex multi-row "pouring attendance" Excel format
-- Generates **Table I** – Overall attendance < 75%
-- Generates **Table II** – Condonation applicants (60–75%)
-- Generates **Table III(A)** – Course-wise detention list
-- Generates **Table III(B)** – Student-wise detention list
-- Outputs a `.docx` matching the official RBU format
-- Clean, responsive admin UI
+- **Drag-and-Drop Excel Upload** (`.xls` / `.xlsx`).
+- **Support for Multiple Academic Years & Branches**:
+  - Year 1 (Generic ECS)
+  - Year 2 (ECS 4th Semester)
+  - Year 3 (ECS 6th Semester)
+  - Year 4 (ECS 8th Semester)
+  - BMED Year 2 (Biomedical 4th Semester)
+  - BMED Year 3 (Biomedical 6th Semester)
+- **Advanced Excel Parsing**: Robust row-merging engine that automatically reconciles multi-row vertical merges, empty spacer rows, and complex "pouring attendance" data.
+- **Dynamic Course Mapping**: Upload optional `.docx` course mapping tables to overwrite default syllabus mappings on the fly.
+- **Course Mapping Persistence**: Uploaded course mappings are cached locally on the server. Subsequent report generations for that program/semester reuse the saved mappings automatically without requiring another upload.
+- **Rules & Detention Tables Engine**:
+  - **Table I (Overall Detention)**: Students with aggregate attendance under 75%.
+  - **Table II (Condonation)**: Students with aggregate attendance between 60% and 75% who applied for condonation.
+  - **Table III (Subject-wise Detention)**: Students detained in specific courses (attendance < 60%).
+    - *Note: For 3rd and 4th years, students with overall attendance >= 75% are automatically exempted from Table III.*
+- **Customized Administrative Layouts**: Outputs docx files formatted with `Times New Roman`, proper header margins, college headers, and dual HOD/Dean signature blocks conforming to RBU specifications.
 
 ---
 
 ## Project Structure
 
 ```
-attendance-system/
-├── client/               ← React + Vite + Tailwind CSS
+detention-report-system/
+├── client/                     ← React + Vite + Tailwind CSS Frontend
 │   └── src/
-│       ├── App.jsx
-│       └── services/api.js
-└── server/               ← Node.js + Express
-    ├── server.js
-    ├── routes/reportRoutes.js
-    ├── controllers/reportController.js
+│       ├── App.jsx             ← Primary user interface
+│       ├── App2.jsx            ← Year 2 UI container
+│       ├── App3.jsx            ← Year 3 UI container
+│       ├── App4.jsx            ← Year 4 UI container
+│       ├── AppBMED2.jsx        ← BMED Year 2 UI container
+│       ├── AppBMED3.jsx        ← BMED Year 3 UI container
+│       ├── LandingPage.jsx     ← Initial landing page
+│       ├── BranchSelectionPage.jsx ← Year/branch selection menu
+│       └── services/api.js      ← Client endpoints caller
+└── server/                     ← Node.js + Express Backend
+    ├── server.js               ← Main app entrypoint
+    ├── routes/
+    │   └── reportRoutes.js     ← Express router mapping routes to controllers
+    ├── controllers/
+    │   ├── reportController.js      ← Y1 controller
+    │   ├── reportController2.js     ← Y2 controller
+    │   ├── reportController3.js     ← Y3 controller
+    │   ├── reportController4.js     ← Y4 controller
+    │   ├── reportControllerBMED2.js ← BMED Y2 controller
+    │   └── reportControllerBMED3.js ← BMED Y3 controller
     └── services/
-        ├── excelParser.js          ← Excel parsing logic
-        ├── attendanceProcessor.js  ← Detention rule engine
-        └── wordGenerator.js        ← .docx generator
+        ├── excelParser.js           ← Merged row Excel parsing engine
+        ├── attendanceProcessor.js   ← Core detention rules processor
+        ├── attendanceProcessorY2.js  ← Year 2 rules processor
+        ├── attendanceProcessorY3.js  ← Year 3 rules processor
+        ├── attendanceProcessorY4.js  ← Year 4 rules processor
+        ├── attendanceProcessorBMED2.js ← BMED Year 2 rules processor
+        ├── attendanceProcessorBMED3.js ← BMED Year 3 rules processor
+        ├── docxMappingParser.js     ← mammoth-based .docx mapping parsing
+        ├── mappingPersistence.js    ← JSON-based persistent mapping cache
+        ├── wordGenerator.js         ← Monolith Word document builder
+        └── wordGeneratorY[2-4].js   ← Program/Year specific Word builders
 ```
 
 ---
 
 ## Quick Start
 
-### Backend
-
+### 1. Start the Backend Server
 ```bash
 cd server
 npm install
-node server.js        # starts on port 5000
+node server.js        # Server starts on port 5000
 ```
 
-### Frontend (development)
-
+### 2. Start the Frontend Dev Client
 ```bash
 cd client
 npm install
-npm run dev           # starts on port 5173, proxies /api → :5000
+npm run dev           # Client starts on port 5173, proxying /api to port 5000
 ```
 
-### Frontend (production build)
-
+### 3. Production Build
 ```bash
 cd client
 npm run build
-# Serve dist/ with any static server, or let Express serve it
+# Serves dist/ statically from production server
 ```
 
 ---
 
-## API
+## API Router Endpoints
+
+All route handlers expect `multipart/form-data` uploads containing Excel sheets and the metadata variables.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/generate` | Upload Excel + metadata, returns filename + stats |
-| `GET`  | `/api/download/:filename` | Download generated .docx |
+| `POST` | `/api/generate` | Generates 1st Year detention report |
+| `POST` | `/api/y2/generate` | Generates 2nd Year (ECS) report |
+| `POST` | `/api/y3/generate` | Generates 3rd Year (ECS) report |
+| `POST` | `/api/y4/generate` | Generates 4th Year (ECS) report |
+| `POST` | `/api/bmed2/generate` | Generates 2nd Year (BMED) report |
+| `POST` | `/api/bmed3/generate` | Generates 3rd Year (BMED) report |
+| `GET`  | `/api/download/:filename` | Downloads generated `.docx` file from cache |
 
-### POST /api/generate (multipart/form-data)
+### Fields expected in `POST` payload:
 
-| Field | Type | Required |
-|-------|------|----------|
-| `file` | Excel file | ✅ |
-| `examName` | string | ✅ |
-| `schoolName` | string | ✅ |
-| `programme` | string | ✅ |
-| `semester` | string | ✅ |
-| `date` | string | ✅ |
-| `condonation` | comma-separated seat numbers | ❌ |
-
----
-
-## Attendance Rules
-
-| Rule | Threshold |
-|------|-----------|
-| Overall detention | < 75% |
-| Condonation window | 60% – 74.99% |
-| Subject-wise detention | < 60% in any subject |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `files` | file list (Excel) | ✅ | Raw student attendance Excel sheets |
+| `mappingFile` | file (.docx) | ❌ | Dynamic Course Mapping file |
+| `examName` | string | ✅ | Examination name (e.g. `Summer-2026`) |
+| `schoolName` | string | ✅ | School name (e.g. `School of ECS`) |
+| `programme` | string | ✅ | Degree programme (e.g. `B.Tech ECS`) |
+| `semester` | string | ✅ | Semester (e.g. `Semester VIII`) |
+| `date` | string | ✅ | Report generation date (e.g. `2026-06-05`) |
+| `condonation` | string | ❌ | Comma-separated list of approved Seat/Roll Numbers |
 
 ---
 
-## Excel Format Expected
+## Core Detention Guidelines
 
-Row 0: Headers — `Roll No. | Unique Id | Seat No | Student name | OverAll Attendance | [subjects...]`
-
-Each student may span 2–3 rows (pouring attendance). The parser handles:
-- Merged rows
-- `"pouring Attendance :28.0/ 33 (84.85)"` format
-- `"10 / 24 ( 41.67 % )"` format
-- Empty separator rows
-- `"97/274 (35.40)"` overall attendance format
-
----
-
-## Tech Stack
-
-- **Frontend**: React 18, Vite, Tailwind CSS, Axios
-- **Backend**: Node.js, Express, Multer, XLSX, docx
+| Parameter | Threshold | Scope |
+|------|-----------|-------|
+| Overall Detention (Table I) | < 75% | All Years |
+| Condonation Band (Table II) | 60% – 74.99% | All Years |
+| Subject Detention (Table III) | < 60% in subject | Year 1 & 2 (Always)<br>Year 3 & 4 (Exempted if Overall >= 75%) |

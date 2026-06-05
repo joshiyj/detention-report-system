@@ -1,13 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { generateReport, getDownloadUrl } from './services/api';
-import LandingPage from './LandingPage';
-import BranchSelectionPage from './BranchSelectionPage';
-import App2 from './App2';
-import App3 from './App3';
-import App4 from './App4';
-import AppBMED2 from './AppBMED2';
-import AppBMED3 from './AppBMED3';
-
+import { generateReportBMED3, getDownloadUrl } from './services/api';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const UploadIcon = () => (
@@ -63,7 +55,7 @@ function StatCard({ label, value, color }) {
 }
 
 // ── InputField ────────────────────────────────────────────────────────────────
-function InputField({ label, name, value, onChange, type = 'text', required }) {
+function InputField({ label, name, value, onChange, type = 'text', required, placeholder }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-sm font-medium text-slate-600">
@@ -76,20 +68,16 @@ function InputField({ label, name, value, onChange, type = 'text', required }) {
         onChange={onChange}
         required={required}
         className="px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm
-                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                   placeholder:text-slate-300 transition"
-        placeholder={`Enter ${label.toLowerCase()}`}
+                   focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent
+                   placeholder:text-slate-350 transition"
+        placeholder={placeholder || `Enter ${label.toLowerCase()}`}
       />
     </div>
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
-export default function App() {
-  const [selectedYear, setSelectedYear] = useState(null);
-  const [selectedBranch, setSelectedBranch] = useState(null);
-  // files is now an array of File objects
-
+// ── AppBMED3 ─────────────────────────────────────────────────────────────────
+export default function AppBMED3({ onBack }) {
   const [files, setFiles]       = useState([]);
   const [mappingFile, setMappingFile] = useState(null);
   const [dragging, setDragging] = useState(false);
@@ -99,11 +87,11 @@ export default function App() {
   const fileRef = useRef();
 
   const [form, setForm] = useState({
-    examName:   '',
-    schoolName: '',
-    programme:  '',
-    semester:   '',
-    date:       '',
+    examName:    'Summer – 2026',
+    schoolName:  'Department of Electronics Engineering',
+    programme:   'Biomedical Engineering',
+    semester:    'VI Semester',
+    date:        new Date().toISOString().split('T')[0],
     condonation: '',
   });
 
@@ -114,7 +102,7 @@ export default function App() {
 
   // ── Add files (dedup by name) ───────────────────────────────────────────────
   const addFiles = useCallback((incoming) => {
-    const valid = Array.from(incoming).filter(isValidExcel);
+    const valid   = Array.from(incoming).filter(isValidExcel);
     const invalid = Array.from(incoming).filter(f => !isValidExcel(f));
     if (invalid.length > 0) {
       setError(`Skipped ${invalid.length} non-Excel file(s). Only .xls and .xlsx are allowed.`);
@@ -137,7 +125,6 @@ export default function App() {
 
   const onFileChange = e => {
     addFiles(e.target.files);
-    // Reset input so the same file can be re-added after removal
     e.target.value = '';
   };
 
@@ -157,14 +144,13 @@ export default function App() {
 
     try {
       const fd = new FormData();
-      // Append all files under the same field name 'files'
       files.forEach(f => fd.append('files', f));
       if (mappingFile) {
         fd.append('mappingFile', mappingFile);
       }
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
 
-      const data = await generateReport(fd);
+      const data = await generateReportBMED3(fd);
       setResult(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Generation failed. Please check your files and try again.');
@@ -173,47 +159,8 @@ export default function App() {
     }
   };
 
-  if (selectedYear === null) {
-    return <LandingPage onSelectYear={setSelectedYear} />;
-  }
-
-  if (selectedBranch === null) {
-    return (
-      <BranchSelectionPage
-        selectedYear={selectedYear}
-        onSelectBranch={setSelectedBranch}
-        onBack={() => {
-          setSelectedYear(null);
-          setSelectedBranch(null);
-        }}
-      />
-    );
-  }
-
-  if (selectedYear === '2' && selectedBranch === 'ECS') {
-    return <App2 onBack={() => setSelectedBranch(null)} />;
-  }
-
-  if (selectedYear === '3' && selectedBranch === 'ECS') {
-    return <App3 onBack={() => setSelectedBranch(null)} />;
-  }
-
-  if (selectedYear === '4' && selectedBranch === 'ECS') {
-    return <App4 onBack={() => setSelectedBranch(null)} />;
-  }
-
-  if (selectedYear === '2' && selectedBranch === 'BIOMED') {
-    return <AppBMED2 onBack={() => setSelectedBranch(null)} />;
-  }
-
-  if (selectedYear === '3' && selectedBranch === 'BIOMED') {
-    return <AppBMED3 onBack={() => setSelectedBranch(null)} />;
-  }
-
-
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-slate-100">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 shadow-sm">
@@ -221,7 +168,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setSelectedBranch(null)}
+              onClick={onBack}
               className="p-2 -ml-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
               title="Back to Branch Selection"
             >
@@ -229,23 +176,23 @@ export default function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
               </svg>
             </button>
-            <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-amber-600 flex items-center justify-center text-white font-bold text-lg shadow shrink-0">
               R
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-bold text-slate-800">RBU Detention Report Generator</h1>
-                <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-full uppercase shrink-0">
-                  1st Year
+                <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 bg-amber-55 text-amber-700 border border-amber-200 rounded-full uppercase shrink-0">
+                  Biomed · 3rd Year (VI Sem)
                 </span>
               </div>
-              <p className="text-xs text-slate-400">Ramdeobaba University, Nagpur — Academic Administration</p>
+              <p className="text-xs text-slate-400">Shri Ramdeobaba College of Engineering and Management, Nagpur</p>
             </div>
           </div>
-          
+
           <button
             type="button"
-            onClick={() => setSelectedBranch(null)}
+            onClick={onBack}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-slate-600 hover:text-slate-800 rounded-lg transition"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -258,16 +205,23 @@ export default function App() {
 
       <main className="max-w-5xl mx-auto px-6 py-10 space-y-8">
 
+        {/* ── Info Banner ─────────────────────────────────────────────────── */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800 space-y-1">
+          <p className="font-semibold">📋 Biomedical Engineering — VI Semester Detention Report</p>
+          <p className="text-xs text-amber-700">
+            Expected columns: <span className="font-mono">Roll No. | Unique Id | Seat No | Student Name | OverAll Attendance | BMICRO | BPPD | MLH | BIP | OOPS | RTOS | SSD | INC | BML LAB | BIP LAB | PR-II</span>
+          </p>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* ── Upload Zone ──────────────────────────────────────────────────── */}
           <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-base font-semibold text-slate-700 mb-1">1. Upload Attendance Sheets</h2>
             <p className="text-xs text-slate-400 mb-4">
-              Upload one Excel file per batch/division (e.g. O1, O2, O3, O4). All batches will be merged into one report.
+              Upload Biomedical Engineering 6th Semester Excel files (e.g. vi bme.xls). Multiple files will be parsed and merged.
             </p>
 
-            {/* Drop zone — always visible so more files can be added */}
             <div
               onDragOver={e => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
@@ -275,15 +229,15 @@ export default function App() {
               onClick={() => fileRef.current.click()}
               className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 cursor-pointer transition mb-4
                 ${dragging
-                  ? 'border-blue-400 bg-blue-50 text-blue-600'
-                  : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-400'
+                  ? 'border-amber-400 bg-amber-50 text-amber-600'
+                  : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 text-slate-400'
                 }`}
             >
               <UploadIcon />
               <p className="text-sm font-medium">
                 {files.length === 0
-                  ? <>Drop Excel files here or <span className="text-blue-500 underline">browse</span></>
-                  : <><span className="text-blue-500 underline flex items-center gap-1 justify-center"><PlusIcon /> Add more files</span></>
+                  ? <>Drop Excel files here or <span className="text-amber-600 underline">browse</span></>
+                  : <><span className="text-amber-600 underline flex items-center gap-1 justify-center"><PlusIcon /> Add more files</span></>
                 }
               </p>
               <p className="text-xs text-slate-300">Supports .xls and .xlsx — multiple files allowed</p>
@@ -297,14 +251,14 @@ export default function App() {
                   {files.length} file{files.length > 1 ? 's' : ''} selected
                 </p>
                 {files.map((f, i) => (
-                  <div key={f.name} className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                    <div className="text-green-500 shrink-0"><FileIcon /></div>
+                  <div key={f.name} className="flex items-center gap-3 bg-amber-50/50 border border-amber-200 rounded-xl px-4 py-3">
+                    <div className="text-amber-600 shrink-0"><FileIcon /></div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-700 truncate">{f.name}</p>
                       <p className="text-xs text-slate-400">{(f.size / 1024).toFixed(1)} KB</p>
                     </div>
-                    <div className="flex items-center gap-2 text-green-600 text-xs font-medium shrink-0">
-                      <CheckIcon /><span>Batch {i + 1}</span>
+                    <div className="flex items-center gap-2 text-amber-700 text-xs font-medium shrink-0">
+                      <CheckIcon /><span>Section {i + 1}</span>
                     </div>
                     <button
                       type="button"
@@ -356,8 +310,8 @@ export default function App() {
                   Choose .docx File
                 </button>
               ) : (
-                <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 w-full">
-                  <div className="text-blue-500 shrink-0"><FileIcon /></div>
+                <div className="flex items-center gap-3 bg-amber-50/50 border border-amber-200 rounded-xl px-4 py-3 w-full">
+                  <div className="text-amber-500 shrink-0"><FileIcon /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-700 truncate">{mappingFile.name}</p>
                     <p className="text-xs text-slate-400">{(mappingFile.size / 1024).toFixed(1)} KB</p>
@@ -394,10 +348,10 @@ export default function App() {
                   name="condonation"
                   value={form.condonation}
                   onChange={handleForm}
-                  placeholder="e.g. UECS26RS20086, UECS26RS20056"
+                  placeholder="e.g. BMU26RS6027, BMU26RS6002"
                   className="px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                             placeholder:text-slate-300 transition"
+                             focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent
+                             placeholder:text-slate-350 transition"
                 />
               </div>
             </div>
@@ -414,17 +368,17 @@ export default function App() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300
-                       text-white font-semibold text-sm tracking-wide transition shadow-md shadow-blue-100
+            className="w-full py-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300
+                       text-white font-semibold text-sm tracking-wide transition shadow-md shadow-amber-100
                        flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Generating Report…
+                Generating Biomedical Report…
               </>
             ) : (
-              `⚡  Generate Detention Report${files.length > 1 ? ` (${files.length} batches)` : ''}`
+              `⚡  Generate Biomedical 3rd Year Report${files.length > 1 ? ` (${files.length} sheets)` : ''}`
             )}
           </button>
         </form>
@@ -434,14 +388,14 @@ export default function App() {
           <section className="bg-white rounded-2xl shadow-sm border border-green-200 p-6 space-y-6">
             <div className="flex items-center gap-2 text-green-600">
               <CheckIcon />
-              <h2 className="text-base font-semibold">Report Generated Successfully</h2>
+              <h2 className="text-base font-semibold">Biomedical 3rd Year Detention Report Generated Successfully</h2>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCard label="Table I (Overall < 75%)"     value={result.stats.tableICount}     color="red"    />
               <StatCard label="Table II (Condonation)"      value={result.stats.tableIICount}     color="amber"  />
               <StatCard label="Detained Students"           value={result.stats.detainedStudents} color="blue"   />
-              <StatCard label="Detained Subject Entries"    value={result.stats.detainedSubjects} color="purple" />
+              <StatCard label="Detained Subject Entries"    value={result.stats.detainedCourses}  color="purple" />
             </div>
 
             <a
@@ -452,7 +406,7 @@ export default function App() {
                          tracking-wide transition shadow-md shadow-emerald-100"
             >
               <DownloadIcon />
-              Download Word Document (.docx)
+              Download Biomedical Word Document (.docx)
             </a>
 
             <p className="text-xs text-slate-400 text-center">

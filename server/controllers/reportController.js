@@ -7,35 +7,76 @@
 
 const path  = require('path');
 const fs    = require('fs');
-const { parseExcel }        = require('../services/excelParser');
-const { processAttendance } = require('../services/attendanceProcessor');
-const { generateWord }      = require('../services/wordGenerator');
+const { parseExcel }                    = require('../services/excelParser');
+const { processAttendance, COURSE_MAP } = require('../services/attendanceProcessor');
+const { generateWord }                  = require('../services/wordGenerator');
+const { parseWordMapping, parseDocxMapping }              = require('../services/docxMappingParser');
+const { getMapping, saveMapping }       = require('../services/mappingPersistence');
+
+// ── Canonical course order matching SHORTFORM.docx (SN 1-9) ──────────────────
+const SHORTFORM_ORDER = [
+  '25EE01TP0201::Theory',    // SN 1 – MI (L)
+  '25EE01TP0201::Practical', // SN 1 – MI (P)
+  '25HS03TH0213::Theory',    // SN 2 – CLA
+  '25EE01TP0202::Theory',    // SN 3 – PPS (L)
+  '25EE01TP0202::Practical', // SN 3 – PPS (P)
+  '25EE01TH0203::Theory',    // SN 4 – AIML
+  '25EE01TP0204::Theory',    // SN 5 – CAO (L)
+  '25EE01TP0204::Practical', // SN 5 – CAO (P)
+  '25HS02TP0201::Theory',    // SN 6 – EPC (L)
+  '25HS02TP0201::Practical', // SN 6 – EPC (P)
+  '25HS02TH0203-1::Theory',  // SN 7 – FLIC
+  '25EE01PR0205::Practical', // SN 8 – MP1
+  '25HS04PR0201::Practical', // SN 9 – HFW
+];
+
+function shortformIndex(code, type, activeShortformOrder) {
+  const order = activeShortformOrder || SHORTFORM_ORDER;
+  const idx = order.indexOf(`${code}::${type}`);
+  return idx === -1 ? order.length : idx;
+}
+
+function shortformCodeIndex(code, activeShortformOrder) {
+  const order = activeShortformOrder || SHORTFORM_ORDER;
+  for (let i = 0; i < order.length; i++) {
+    if (order[i].startsWith(`${code}::`)) return i;
+  }
+  return order.length;
+}
 
 const GENERATED_DIR = path.join(__dirname, '..', 'generated');
 
 // ── Merge helpers ─────────────────────────────────────────────────────────────
 
 /**
- * Merge two tableIIIA arrays (each item = { code, fullName, type, rows[] }).
- * Groups with the same code+type have their rows concatenated.
+ * Merge two tableIIIA arrays (each item = { code, fullName, rows[] }).
+ * Courses with the same code have their rows concatenated; duplicate seatNos are
+ * de-duplicated by keeping the entry with the most information.
  */
-function mergeTableIIIA(a, b) {
+function mergeTableIIIA(a, b, activeShortformOrder) {
   const map = {};
   for (const item of [...a, ...b]) {
-    const key = `${item.code}::${item.type}`;
+    const key = item.code;
     if (!map[key]) {
-      map[key] = { code: item.code, fullName: item.fullName, type: item.type, rows: [] };
+      map[key] = { code: item.code, fullName: item.fullName, rows: [] };
     }
-    map[key].rows.push(...item.rows);
+    // Merge rows: if a row for the same student already exists, combine pct strings
+    for (const row of item.rows) {
+      const existing = map[key].rows.find(r => r.seatNo === row.seatNo);
+      if (existing) {
+        // Combine if not already combined
+        if (existing.pct !== row.pct) {
+          existing.pct  = `${existing.pct}/${row.pct}`;
+          existing.type = 'Theory/Practical';
+        }
+      } else {
+        map[key].rows.push({ ...row });
+      }
+    }
   }
-  // Re-sort: by course code then Theory before Practical
-  return Object.values(map).sort((x, y) => {
-    if (x.code < y.code) return -1;
-    if (x.code > y.code) return  1;
-    if (x.type === 'Theory' && y.type === 'Practical') return -1;
-    if (x.type === 'Practical' && y.type === 'Theory') return  1;
-    return 0;
-  });
+  // Re-sort by SHORTFORM.docx order (SN 1-9)
+  return Object.values(map)
+    .sort((x, y) => shortformCodeIndex(x.code, activeShortformOrder) - shortformCodeIndex(y.code, activeShortformOrder));
 }
 
 /**
@@ -48,10 +89,13 @@ function mergeTableIIIA(a, b) {
  *   semester    – string
  *   date        – string
  *   condonation – comma-separated seat numbers (optional)
+ *   mappingFile - optional .docx mapping file
  */
 async function generateReport(req, res) {
   try {
-    const files = req.files;   // array from upload.array('files', 10)
+    const files = req.files ? req.files['files'] : null;
+    const mappingFile = req.files ? req.files['mappingFile']?.[0] : null;
+
     if (!files || files.length === 0) {
       return res.status(400).json({ error: 'No Excel files uploaded.' });
     }
@@ -61,6 +105,18 @@ async function generateReport(req, res) {
     if (!examName || !schoolName || !programme || !semester || !date) {
       return res.status(400).json({ error: 'All metadata fields are required.' });
     }
+
+    // Parse optional dynamic mapping docx
+    let dynamicMapping = null;
+    if (mappingFile) {
+      dynamicMapping = await parseDocxMapping(mappingFile.buffer);
+      if (dynamicMapping) {
+        saveMapping('y1', dynamicMapping);
+      }
+    } else {
+      dynamicMapping = getMapping('y1');
+    }
+    const activeShortformOrder = dynamicMapping ? dynamicMapping.shortformOrder : SHORTFORM_ORDER;
 
     // Parse condonation seat list
     const condonationSeats = new Set(
@@ -88,12 +144,12 @@ async function generateReport(req, res) {
 
       // 2. Process attendance rules
       const { tableI, tableII, tableIIIA, tableIIIB } =
-        processAttendance(students, subjectNames, condonationSeats);
+        processAttendance(students, subjectNames, condonationSeats, dynamicMapping);
 
       // 3. Accumulate
       mergedTableI    = mergedTableI.concat(tableI);
       mergedTableII   = mergedTableII.concat(tableII);
-      mergedTableIIIA = mergeTableIIIA(mergedTableIIIA, tableIIIA);
+      mergedTableIIIA = mergeTableIIIA(mergedTableIIIA, tableIIIA, activeShortformOrder);
       mergedTableIIIB = mergedTableIIIB.concat(tableIIIB);
       totalStudents  += students.length;
     }

@@ -1,13 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { generateReport, getDownloadUrl } from './services/api';
-import LandingPage from './LandingPage';
-import BranchSelectionPage from './BranchSelectionPage';
-import App2 from './App2';
-import App3 from './App3';
-import App4 from './App4';
-import AppBMED2 from './AppBMED2';
-import AppBMED3 from './AppBMED3';
-
+import { generateReport3, getDownloadUrl } from './services/api';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const UploadIcon = () => (
@@ -52,7 +44,7 @@ function StatCard({ label, value, color }) {
     red:    'bg-red-50   border-red-200   text-red-700',
     amber:  'bg-amber-50 border-amber-200 text-amber-700',
     blue:   'bg-blue-50  border-blue-200  text-blue-700',
-    purple: 'bg-purple-50 border-purple-200 text-purple-700',
+    teal:   'bg-teal-50  border-teal-200  text-teal-700',
   };
   return (
     <div className={`rounded-xl border px-5 py-4 flex flex-col gap-1 ${colors[color]}`}>
@@ -63,7 +55,7 @@ function StatCard({ label, value, color }) {
 }
 
 // ── InputField ────────────────────────────────────────────────────────────────
-function InputField({ label, name, value, onChange, type = 'text', required }) {
+function InputField({ label, name, value, onChange, type = 'text', required, placeholder }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-sm font-medium text-slate-600">
@@ -76,20 +68,16 @@ function InputField({ label, name, value, onChange, type = 'text', required }) {
         onChange={onChange}
         required={required}
         className="px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm
-                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                   placeholder:text-slate-300 transition"
-        placeholder={`Enter ${label.toLowerCase()}`}
+                   focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent
+                   placeholder:text-slate-350 transition"
+        placeholder={placeholder || `Enter ${label.toLowerCase()}`}
       />
     </div>
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
-export default function App() {
-  const [selectedYear, setSelectedYear] = useState(null);
-  const [selectedBranch, setSelectedBranch] = useState(null);
-  // files is now an array of File objects
-
+// ── App3 ───────────────────────────────────────────────────────────────────────
+export default function App3({ onBack }) {
   const [files, setFiles]       = useState([]);
   const [mappingFile, setMappingFile] = useState(null);
   const [dragging, setDragging] = useState(false);
@@ -99,20 +87,18 @@ export default function App() {
   const fileRef = useRef();
 
   const [form, setForm] = useState({
-    examName:   '',
-    schoolName: '',
-    programme:  '',
-    semester:   '',
-    date:       '',
+    examName:    'Summer - 2026',
+    schoolName:  'School of Electrical & Computer Science',
+    programme:   'Electronics and Computer Science',
+    semester:    'VI Semester',
+    date:        new Date().toISOString().split('T')[0],
     condonation: '',
   });
 
   const handleForm = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
-  // ── File validation helper ──────────────────────────────────────────────────
   const isValidExcel = f => f.name.endsWith('.xls') || f.name.endsWith('.xlsx');
 
-  // ── Add files (dedup by name) ───────────────────────────────────────────────
   const addFiles = useCallback((incoming) => {
     const valid = Array.from(incoming).filter(isValidExcel);
     const invalid = Array.from(incoming).filter(f => !isValidExcel(f));
@@ -128,7 +114,6 @@ export default function App() {
     });
   }, []);
 
-  // ── Drag & drop ─────────────────────────────────────────────────────────────
   const onDrop = useCallback(e => {
     e.preventDefault();
     setDragging(false);
@@ -137,7 +122,6 @@ export default function App() {
 
   const onFileChange = e => {
     addFiles(e.target.files);
-    // Reset input so the same file can be re-added after removal
     e.target.value = '';
   };
 
@@ -146,7 +130,6 @@ export default function App() {
     setResult(null);
   };
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async e => {
     e.preventDefault();
     if (files.length === 0) { setError('Please upload at least one Excel attendance sheet.'); return; }
@@ -157,14 +140,13 @@ export default function App() {
 
     try {
       const fd = new FormData();
-      // Append all files under the same field name 'files'
       files.forEach(f => fd.append('files', f));
       if (mappingFile) {
         fd.append('mappingFile', mappingFile);
       }
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
 
-      const data = await generateReport(fd);
+      const data = await generateReport3(fd);
       setResult(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Generation failed. Please check your files and try again.');
@@ -173,47 +155,8 @@ export default function App() {
     }
   };
 
-  if (selectedYear === null) {
-    return <LandingPage onSelectYear={setSelectedYear} />;
-  }
-
-  if (selectedBranch === null) {
-    return (
-      <BranchSelectionPage
-        selectedYear={selectedYear}
-        onSelectBranch={setSelectedBranch}
-        onBack={() => {
-          setSelectedYear(null);
-          setSelectedBranch(null);
-        }}
-      />
-    );
-  }
-
-  if (selectedYear === '2' && selectedBranch === 'ECS') {
-    return <App2 onBack={() => setSelectedBranch(null)} />;
-  }
-
-  if (selectedYear === '3' && selectedBranch === 'ECS') {
-    return <App3 onBack={() => setSelectedBranch(null)} />;
-  }
-
-  if (selectedYear === '4' && selectedBranch === 'ECS') {
-    return <App4 onBack={() => setSelectedBranch(null)} />;
-  }
-
-  if (selectedYear === '2' && selectedBranch === 'BIOMED') {
-    return <AppBMED2 onBack={() => setSelectedBranch(null)} />;
-  }
-
-  if (selectedYear === '3' && selectedBranch === 'BIOMED') {
-    return <AppBMED3 onBack={() => setSelectedBranch(null)} />;
-  }
-
-
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50 to-slate-100">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 shadow-sm">
@@ -221,7 +164,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setSelectedBranch(null)}
+              onClick={onBack}
               className="p-2 -ml-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
               title="Back to Branch Selection"
             >
@@ -229,23 +172,23 @@ export default function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
               </svg>
             </button>
-            <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-teal-600 flex items-center justify-center text-white font-bold text-lg shadow shrink-0">
               R
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-bold text-slate-800">RBU Detention Report Generator</h1>
-                <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-full uppercase shrink-0">
-                  1st Year
+                <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 bg-teal-50 text-teal-600 border border-teal-100 rounded-full uppercase shrink-0">
+                  3rd Year (VI Sem)
                 </span>
               </div>
               <p className="text-xs text-slate-400">Ramdeobaba University, Nagpur — Academic Administration</p>
             </div>
           </div>
-          
+
           <button
             type="button"
-            onClick={() => setSelectedBranch(null)}
+            onClick={onBack}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-slate-600 hover:text-slate-800 rounded-lg transition"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -264,10 +207,9 @@ export default function App() {
           <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-base font-semibold text-slate-700 mb-1">1. Upload Attendance Sheets</h2>
             <p className="text-xs text-slate-400 mb-4">
-              Upload one Excel file per batch/division (e.g. O1, O2, O3, O4). All batches will be merged into one report.
+              Upload 3rd Year (6th Semester) ECS Excel files (e.g. VI A, VI B section sheets). Multiple files will be merged.
             </p>
 
-            {/* Drop zone — always visible so more files can be added */}
             <div
               onDragOver={e => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
@@ -275,36 +217,35 @@ export default function App() {
               onClick={() => fileRef.current.click()}
               className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 cursor-pointer transition mb-4
                 ${dragging
-                  ? 'border-blue-400 bg-blue-50 text-blue-600'
-                  : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-400'
+                  ? 'border-teal-400 bg-teal-50 text-teal-600'
+                  : 'border-slate-200 hover:border-teal-300 hover:bg-teal-50/40 text-slate-400'
                 }`}
             >
               <UploadIcon />
               <p className="text-sm font-medium">
                 {files.length === 0
-                  ? <>Drop Excel files here or <span className="text-blue-500 underline">browse</span></>
-                  : <><span className="text-blue-500 underline flex items-center gap-1 justify-center"><PlusIcon /> Add more files</span></>
+                  ? <>Drop Excel files here or <span className="text-teal-500 underline">browse</span></>
+                  : <><span className="text-teal-500 underline flex items-center gap-1 justify-center"><PlusIcon /> Add more files</span></>
                 }
               </p>
-              <p className="text-xs text-slate-300">Supports .xls and .xlsx — multiple files allowed</p>
+              <p className="text-xs text-slate-300 font-medium">Structure: Roll No. | Unique Id | Seat No | Student Name | Overall Attendance | DBMS | SVV | DHV ...</p>
               <input ref={fileRef} type="file" accept=".xls,.xlsx" multiple className="hidden" onChange={onFileChange} />
             </div>
 
-            {/* File list */}
             {files.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
                   {files.length} file{files.length > 1 ? 's' : ''} selected
                 </p>
                 {files.map((f, i) => (
-                  <div key={f.name} className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                    <div className="text-green-500 shrink-0"><FileIcon /></div>
+                  <div key={f.name} className="flex items-center gap-3 bg-teal-50/50 border border-teal-200 rounded-xl px-4 py-3">
+                    <div className="text-teal-500 shrink-0"><FileIcon /></div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-700 truncate">{f.name}</p>
                       <p className="text-xs text-slate-400">{(f.size / 1024).toFixed(1)} KB</p>
                     </div>
-                    <div className="flex items-center gap-2 text-green-600 text-xs font-medium shrink-0">
-                      <CheckIcon /><span>Batch {i + 1}</span>
+                    <div className="flex items-center gap-2 text-teal-600 text-xs font-medium shrink-0">
+                      <CheckIcon /><span>Section {i + 1}</span>
                     </div>
                     <button
                       type="button"
@@ -356,8 +297,8 @@ export default function App() {
                   Choose .docx File
                 </button>
               ) : (
-                <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 w-full">
-                  <div className="text-blue-500 shrink-0"><FileIcon /></div>
+                <div className="flex items-center gap-3 bg-teal-50/50 border border-teal-200 rounded-xl px-4 py-3 w-full">
+                  <div className="text-teal-500 shrink-0"><FileIcon /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-700 truncate">{mappingFile.name}</p>
                     <p className="text-xs text-slate-400">{(mappingFile.size / 1024).toFixed(1)} KB</p>
@@ -379,11 +320,11 @@ export default function App() {
           <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-base font-semibold text-slate-700 mb-5">2. Report Details</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <InputField label="Exam Name"    name="examName"   value={form.examName}   onChange={handleForm} required />
-              <InputField label="School Name"  name="schoolName" value={form.schoolName} onChange={handleForm} required />
-              <InputField label="Programme"    name="programme"  value={form.programme}  onChange={handleForm} required />
-              <InputField label="Semester"     name="semester"   value={form.semester}   onChange={handleForm} required />
-              <InputField label="Date"         name="date"       value={form.date}       onChange={handleForm} type="date" required />
+              <InputField label="Exam Name"    name="examName"    value={form.examName}    onChange={handleForm} required />
+              <InputField label="School Name"  name="schoolName"  value={form.schoolName}  onChange={handleForm} required />
+              <InputField label="Programme"    name="programme"   value={form.programme}   onChange={handleForm} required />
+              <InputField label="Semester"     name="semester"    value={form.semester}    onChange={handleForm} required />
+              <InputField label="Date"         name="date"        value={form.date}        onChange={handleForm} type="date" required />
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-slate-600">
                   Condonation Seat Numbers
@@ -394,9 +335,9 @@ export default function App() {
                   name="condonation"
                   value={form.condonation}
                   onChange={handleForm}
-                  placeholder="e.g. UECS26RS20086, UECS26RS20056"
+                  placeholder="e.g. ENCS26RS6020, ENCS26RS6064"
                   className="px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                             focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent
                              placeholder:text-slate-300 transition"
                 />
               </div>
@@ -414,17 +355,17 @@ export default function App() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300
-                       text-white font-semibold text-sm tracking-wide transition shadow-md shadow-blue-100
+            className="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300
+                       text-white font-semibold text-sm tracking-wide transition shadow-md shadow-teal-100
                        flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Generating Report…
+                Generating 3rd Year Report…
               </>
             ) : (
-              `⚡  Generate Detention Report${files.length > 1 ? ` (${files.length} batches)` : ''}`
+              `⚡  Generate 3rd Year Report${files.length > 1 ? ` (${files.length} sections)` : ''}`
             )}
           </button>
         </form>
@@ -434,14 +375,14 @@ export default function App() {
           <section className="bg-white rounded-2xl shadow-sm border border-green-200 p-6 space-y-6">
             <div className="flex items-center gap-2 text-green-600">
               <CheckIcon />
-              <h2 className="text-base font-semibold">Report Generated Successfully</h2>
+              <h2 className="text-base font-semibold">3rd Year Detention Report Generated Successfully</h2>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard label="Table I (Overall < 75%)"     value={result.stats.tableICount}     color="red"    />
-              <StatCard label="Table II (Condonation)"      value={result.stats.tableIICount}     color="amber"  />
-              <StatCard label="Detained Students"           value={result.stats.detainedStudents} color="blue"   />
-              <StatCard label="Detained Subject Entries"    value={result.stats.detainedSubjects} color="purple" />
+              <StatCard label="Table I (Overall < 75%)"     value={result.stats.tableICount}      color="red"   />
+              <StatCard label="Table II (Condonation)"      value={result.stats.tableIICount}     color="amber" />
+              <StatCard label="Detained Students"           value={result.stats.detainedStudents} color="blue"  />
+              <StatCard label="Detained Course Entries"     value={result.stats.detainedCourses}  color="teal"  />
             </div>
 
             <a
@@ -452,7 +393,7 @@ export default function App() {
                          tracking-wide transition shadow-md shadow-emerald-100"
             >
               <DownloadIcon />
-              Download Word Document (.docx)
+              Download 3rd Year Word Document (.docx)
             </a>
 
             <p className="text-xs text-slate-400 text-center">
@@ -463,7 +404,6 @@ export default function App() {
 
       </main>
 
-      {/* ── Footer ─────────────────────────────────────────────────────────── */}
       <footer className="text-center py-8 text-xs text-slate-400">
         RBU Detention Report Generator · Academic Administration System
       </footer>
