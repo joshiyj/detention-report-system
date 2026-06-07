@@ -325,7 +325,11 @@ export default function App3({ onBack }) {
               <InputField label="Programme"    name="programme"   value={form.programme}   onChange={handleForm} required />
               <InputField label="Semester"     name="semester"    value={form.semester}    onChange={handleForm} required />
               <InputField label="Date"         name="date"        value={form.date}        onChange={handleForm} type="date" required />
-              <div className="flex flex-col gap-1.5">
+              <InputField label="Department Name" name="departmentName" value={form.departmentName} onChange={handleForm} required placeholder="e.g. Department of Electronics Engineering" />
+              <InputField label="Academic Coordinator Name" name="coordinatorName" value={form.coordinatorName} onChange={handleForm} required />
+              <InputField label="H.O.D. Name" name="hodName" value={form.hodName} onChange={handleForm} required />
+              <InputField label="H.O.D. Branch" name="branchName" value={form.branchName} onChange={handleForm} required placeholder="e.g. EN, ECS" />
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <label className="text-sm font-medium text-slate-600">
                   Condonation Seat Numbers
                   <span className="ml-1 text-xs text-slate-400 font-normal">(optional, comma-separated)</span>

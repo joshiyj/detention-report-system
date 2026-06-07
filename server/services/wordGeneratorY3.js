@@ -24,6 +24,68 @@ const fs = require('fs');
 // ── Border styles ─────────────────────────────────────────────────────────────
 const BORDER      = { style: BorderStyle.SINGLE, size: 6, color: '000000' };
 const ALL_BORDERS = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
+const NO_BORDERS  = {
+  top:    { style: BorderStyle.NONE, size: 0, color: 'auto' },
+  bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+  left:   { style: BorderStyle.NONE, size: 0, color: 'auto' },
+  right:  { style: BorderStyle.NONE, size: 0, color: 'auto' },
+  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+  insideVertical:   { style: BorderStyle.NONE, size: 0, color: 'auto' },
+};
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  return dateStr;
+}
+
+function buildSignatureTableY3(coordinatorName, hodName, branchName) {
+  return new Table({
+    width: { size: 9026, type: WidthType.DXA },
+    borders: NO_BORDERS,
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 4513, type: WidthType.DXA },
+            borders: NO_BORDERS,
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.LEFT,
+                children: [bold(coordinatorName, 22)],
+                spacing: { before: 800, after: 40 },
+              }),
+              new Paragraph({
+                alignment: AlignmentType.LEFT,
+                children: [bold(`(Academic Cordinator, ${branchName})`, 22)],
+              }),
+            ],
+          }),
+          new TableCell({
+            width: { size: 4513, type: WidthType.DXA },
+            borders: NO_BORDERS,
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [bold(hodName, 22)],
+                spacing: { before: 800, after: 40 },
+              }),
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [bold(`(HoD, ${branchName})`, 22)],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
 
 // ── Typography helpers ────────────────────────────────────────────────────────
 const bold   = (text, size = 20) => new TextRun({ text: String(text ?? ''), bold: true,  size, font: 'Times New Roman' });
@@ -49,7 +111,6 @@ function headerCell(text, width, colSpan = 1, rowSpan = 1) {
   return new TableCell({
     borders: ALL_BORDERS,
     width: { size: width, type: WidthType.DXA },
-    shading: { fill: 'D9E1F2', type: ShadingType.CLEAR },
     margins: { top: 80, bottom: 80, left: 100, right: 100 },
     columnSpan: colSpan,
     rowSpan,
@@ -76,36 +137,31 @@ function dataCell(text, width, alignment = AlignmentType.CENTER, verticalMerge =
 }
 
 // ── Table I & II ──────────────────────────────────────────────────────────────
-// Cols: SN | Student ID/Roll No. | Name of the students | Aggregate Attendance (%)
-const T12_SN     = 500;
-const T12_SEAT   = 2000;
+// Cols: Student ID/Roll No. | Name of the students | Aggregate Attendance (%)
+const T12_SEAT   = 2500;
 const T12_NAME   = 4800;
 const T12_ATT    = 1726;
-// sum = 9026
-const T12_WIDTHS = [T12_SN, T12_SEAT, T12_NAME, T12_ATT];
+const T12_WIDTHS = [T12_SEAT, T12_NAME, T12_ATT];
 
 function buildTableI_II(rows) {
   const headerRow = new TableRow({
     tableHeader: true,
     children: [
-      headerCell('SN',                      T12_SN),
-      headerCell('Student ID / Seat No.',   T12_SEAT),
-      headerCell('Name of the Students',    T12_NAME),
+      headerCell('Student ID/\rRoll No.',   T12_SEAT),
+      headerCell('Name of the students',    T12_NAME),
       headerCell('Aggregate Attendance (%)', T12_ATT),
     ],
   });
 
   const dataRows = rows.length > 0
-    ? rows.map((r, idx) => new TableRow({
+    ? rows.map((r) => new TableRow({
         children: [
-          dataCell(String(idx + 1),              T12_SN),
           dataCell(r.seatNo || r.rollNo || '',   T12_SEAT),
           dataCell(r.name ?? '',                 T12_NAME, AlignmentType.LEFT),
           dataCell(r.overall ?? '',              T12_ATT),
         ],
       }))
     : [new TableRow({ children: [
-        dataCell('—', T12_SN),
         dataCell('—', T12_SEAT),
         dataCell('No students', T12_NAME, AlignmentType.LEFT),
         dataCell('—', T12_ATT),
@@ -194,12 +250,16 @@ function buildTableIII(studentList) {
 
 // ── Main generator ────────────────────────────────────────────────────────────
 async function generateWordY3(meta, { tableI, tableII, tableIII }, outputPath) {
-  const { examName, schoolName, programme, semester, date } = meta;
+  const { examName, programme, semester, date } = meta;
+  const departmentName   = meta.departmentName || 'Department of Electronics  Engineering';
+  const coordinatorName  = meta.coordinatorName || 'Dr. Anju Gupta';
+  const hodName          = meta.hodName || 'Dr. N. P. Narkhede';
+  const branchName       = meta.branchName || 'EN';
 
   const doc = new Document({
     styles: {
       default: {
-        document: { run: { font: 'Times New Roman', size: 20 } },
+        document: { run: { font: 'Times New Roman', size: 22 } },
       },
     },
     sections: [{
@@ -211,46 +271,41 @@ async function generateWordY3(meta, { tableI, tableII, tableIII }, outputPath) {
       },
       children: [
 
-        // ── University heading ─────────────────────────────────────────────────
-        centerPara([bold('RAMDEOBABA UNIVERSITY, NAGPUR', 28)], 40),
-        centerPara([bold('DETENTION LIST', 26)], 40),
-        centerPara([bold(examName, 24)], 40),
-        centerPara([normal(`Date: ${date}`, 20)], 80),
+        // ── College heading ─────────────────────────────────────────────────
+        centerPara([bold('SHRI RAMDEOBABA COLLEGE OF ENGINEERING AND MANAGEMENT, NAGPUR', 28)], 40),
+        centerPara([normal(departmentName, 22)], 40),
+
+        new Paragraph({
+          alignment: AlignmentType.RIGHT,
+          spacing: { after: 120 },
+          children: [normal(`Date: ${formatDate(date)}`, 22)],
+        }),
 
         new Paragraph({
           alignment: AlignmentType.LEFT,
-          spacing: { after: 40 },
-          children: [normal(`School: ${schoolName}`, 20)],
-        }),
-        new Paragraph({
-          alignment: AlignmentType.LEFT,
-          spacing: { after: 160 },
+          spacing: { after: 180 },
           children: [
-            normal(`Programme: ${programme}`, 20),
-            new TextRun({ text: '     ', font: 'Times New Roman', size: 20 }),
-            normal(`Semester: ${semester}`, 20),
+            new TextRun({
+              text: 'Submitted to Principal for Approval through Dean Academics',
+              underline: {},
+              size: 22,
+              font: 'Times New Roman'
+            })
           ],
-        }),
-
-        new Paragraph({
-          alignment: AlignmentType.LEFT,
-          spacing: { after: 160 },
-          children: [italic('Submitted to Vice-Chancellor for Approval through Dean Academics', 19)],
         }),
 
         // ── Table I ───────────────────────────────────────────────────────────
         new Paragraph({
-          spacing: { after: 60 },
+          spacing: { after: 120 },
           children: [
-            normal(`Table I is the list of students of programme ${programme} ${semester} having aggregate attendance less than 75%.`, 19),
+            normal(`Table I is the list of students of programme ${programme} semester ${semester} having aggregate attendance less than 75%.`, 22),
           ],
         }),
         new Paragraph({
-          spacing: { after: 100 },
+          spacing: { after: 180 },
           children: [
-            normal('As per the ordinances/ regulations of the university these students should be detained in the ', 19),
-            bold(examName, 19),
-            normal(' examination in all courses.', 19),
+            normal('As per the ordinances/ regulations of the college these students should be detained in the ', 22),
+            normal(`${examName} examination in all courses.`, 22),
           ],
         }),
         sectionHeading('Table I'),
@@ -259,11 +314,11 @@ async function generateWordY3(meta, { tableI, tableII, tableIII }, outputPath) {
 
         // ── Table II ──────────────────────────────────────────────────────────
         new Paragraph({
-          spacing: { after: 60 },
+          spacing: { after: 180 },
           children: [
-            normal(`However Table II, is the list of students of programme ${programme} ${semester} having aggregate attendance between 60% and 75% and have applied for condonation of attendance. The application forms and medical certificates / other relevant documents have been attached herewith. After due consideration and as per the regulation R 17, it is recommended that these students may be permitted to appear in all courses in the `, 19),
-            bold(examName, 19),
-            normal(' examinations. Since the absence was due to circumstances beyond the control of the students.', 19),
+            normal(`However Table II, is the list of students of programme ${programme} semester ${semester} having aggregate attendance between 60% and 75% and has applied for condonation of attendance. The application forms and medical certificates / other relevant documents have been attached herewith. After due consideration and as per the regulation R 17, it is recommended that these students may be permitted to appear in all courses in the `, 22),
+            normal(`${examName} examinations. `, 22),
+            normal('Since the absence was due to circumstances beyond the control of the students.', 22),
           ],
         }),
         sectionHeading('Table II'),
@@ -272,11 +327,10 @@ async function generateWordY3(meta, { tableI, tableII, tableIII }, outputPath) {
 
         // ── Table III ─────────────────────────────────────────────────────────
         new Paragraph({
-          spacing: { after: 60 },
+          spacing: { after: 180 },
           children: [
-            normal(`Table III is the list of students of programme ${programme} ${semester} along with the course code and the attendance in the courses in which they are recommended to be detained in `, 19),
-            bold(examName, 19),
-            normal(' examination as per regulation R 17.', 19),
+            normal(`Table III is the list of students of programme ${programme} semester ${semester} along with the course code and the attendance in the courses in which they are recommended to be detained in `, 22),
+            normal(`${examName} examination as per regulation R 17.`, 22),
           ],
         }),
         sectionHeading('Table III – Student wise Detention list'),
@@ -284,23 +338,7 @@ async function generateWordY3(meta, { tableI, tableII, tableIII }, outputPath) {
         new Paragraph({ spacing: { after: 240 }, children: [] }),
 
         // ── Signature footer ──────────────────────────────────────────────────
-        new Paragraph({
-          spacing: { after: 60 },
-          children: [
-            normal('Academic Coordinator, EN', 20),
-            new TextRun({ text: '\t\t\t\t\t\t\t\t', size: 20 }),
-            normal('H.O.D.', 20),
-          ],
-          tabStops: [{ type: 'right', position: 9026 }],
-        }),
-        new Paragraph({
-          spacing: { after: 0 },
-          children: [
-            normal('Name & Signature', 20),
-            new TextRun({ text: '\t\t\t\t\t\t\t\t', size: 20 }),
-            normal('Name & Signature', 20),
-          ],
-        }),
+        buildSignatureTableY3(coordinatorName, hodName, branchName),
       ],
     }],
   });

@@ -93,6 +93,9 @@ export default function App2({ onBack }) {
     semester:   'IV Semester',
     date:       new Date().toISOString().split('T')[0],
     condonation: '',
+    coordinatorName: 'Dr. Anju Gupta',
+    hodName: 'Dr. N.P. Narkhede',
+    branchName: 'EN',
   });
 
   const handleForm = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -330,7 +333,10 @@ export default function App2({ onBack }) {
               <InputField label="Programme"    name="programme"  value={form.programme}  onChange={handleForm} required />
               <InputField label="Semester"     name="semester"   value={form.semester}   onChange={handleForm} required />
               <InputField label="Date"         name="date"       value={form.date}       onChange={handleForm} type="date" required />
-              <div className="flex flex-col gap-1.5">
+              <InputField label="Academic Coordinator Name" name="coordinatorName" value={form.coordinatorName} onChange={handleForm} required />
+              <InputField label="H.O.D. Name" name="hodName" value={form.hodName} onChange={handleForm} required />
+              <InputField label="H.O.D. Branch" name="branchName" value={form.branchName} onChange={handleForm} required placeholder="e.g. EN, ECS" />
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <label className="text-sm font-medium text-slate-600">
                   Condonation Roll Numbers
                   <span className="ml-1 text-xs text-slate-400 font-normal">(optional, comma-separated)</span>
@@ -343,7 +349,7 @@ export default function App2({ onBack }) {
                   placeholder="e.g. O1_5, O1_12, O1_40"
                   className="px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm
                              focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent
-                             placeholder:text-slate-300 transition"
+                             placeholder:text-slate-350 transition"
                 />
               </div>
             </div>

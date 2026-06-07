@@ -45,7 +45,7 @@ async function generateReport3(req, res) {
       return res.status(400).json({ error: 'No Excel files uploaded.' });
     }
 
-    const { examName, schoolName, programme, semester, date, condonation } = req.body;
+    const { examName, schoolName, programme, semester, date, condonation, coordinatorName, hodName, branchName, departmentName } = req.body;
 
     if (!examName || !schoolName || !programme || !semester || !date) {
       return res.status(400).json({ error: 'All metadata fields are required.' });
@@ -111,7 +111,7 @@ async function generateReport3(req, res) {
     const outputPath = path.join(GENERATED_DIR, filename);
 
     await generateWordY3(
-      { examName, schoolName, programme, semester, date },
+      { examName, schoolName, programme, semester, date, coordinatorName, hodName, branchName, departmentName },
       {
         tableI:   mergedTableI,
         tableII:  mergedTableII,

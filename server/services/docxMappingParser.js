@@ -46,12 +46,22 @@ function parseHtmlMappingTable(html) {
   while (pos < html.length) {
     if (html.substring(pos, pos + 6) === '<table') {
       depth++;
-      pos += 6;
+      const closeIdx = html.indexOf('>', pos);
+      if (closeIdx !== -1) {
+        pos = closeIdx + 1;
+      } else {
+        pos += 6;
+      }
       continue;
     }
     if (html.substring(pos, pos + 7) === '</table') {
       depth--;
-      pos += 7;
+      const closeIdx = html.indexOf('>', pos);
+      if (closeIdx !== -1) {
+        pos = closeIdx + 1;
+      } else {
+        pos += 7;
+      }
       if (depth === 0) {
         break; // End of outermost table
       }
