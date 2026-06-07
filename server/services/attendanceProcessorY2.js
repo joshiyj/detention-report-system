@@ -130,6 +130,11 @@ function processAttendanceY2new(students, subjectNames, condonationSeats = new S
     }
 
     // ── Table III — per-subject detention ─────────────────────────────────────
+    // If a student has overall attendance >= 75%, they are exempt from subject detention.
+    if (overall !== null && overall >= OVERALL_THRESHOLD) {
+      continue;
+    }
+
     // Step 1: Collect all subject pct values, grouped by course code (to apply avg rule for T+P pairs)
     // Blank cells (null) = not enrolled → skip entirely
     const allCourseData = {}; // code → { code, fullName, sn, theoryPct, practicalPct, theoryAbbr, practicalAbbr }
