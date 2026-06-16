@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'https://detention-report-system-backend.onrender.com/api',
+  baseURL: 'https://detention-report-system-backend-tl4y.onrender.com/api',
 });
 
 export async function generateReport(formData) {
