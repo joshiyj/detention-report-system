@@ -47,5 +47,5 @@ export async function generateReportBMED3(formData) {
 }
 
 export function getDownloadUrl(filename) {
-  return `https://detention-report-system-backend.onrender.com/api/download/${filename}`;
+  return `https://detention-report-system-backend-tl4y.onrender.com/api/download/${filename}`;
 }
