@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'https://detention-report-system-backend-tl4y.onrender.com/api',
+  baseURL: 'https://detention-report-system.onrender.com/api',
 });
 
 export async function generateReport(formData) {
@@ -47,5 +47,5 @@ export async function generateReportBMED3(formData) {
 }
 
 export function getDownloadUrl(filename) {
-  return `https://detention-report-system-backend-tl4y.onrender.com/api/download/${filename}`;
+  return `https://detention-report-system.onrender.com/api/download/${filename}`;
 }
