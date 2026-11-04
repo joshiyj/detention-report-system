@@ -26,8 +26,8 @@ The **RBU Detention Report Generator** is an automated academic administration u
 The backend processes records against institutional rules:
 - **Table I (Overall Detention)**: Captures students whose **Aggregate Overall Attendance** is strictly **below 75%**.
 - **Table II (Condonation Recommended)**: Identifies students within the **60% to 74.99%** window who have been manually granted condonation by the administration.
-- **Table III (A) (Course-wise Detention)**: Aggregates list of students who have **less than 60%** attendance in a specific course.
-- **Table III (B) (Student-wise Detention)**: Cross-references course-wise detentions by student, displaying each student with all the courses they are detained in.
+- **Table III (A) (Course-wise Detention)**: Aggregates list of students who have **less than 60%** attendance in a specific course. Students whose overall attendance is **75% or more** are excluded.
+- **Table III (B) (Student-wise Detention)**: Cross-references course-wise detentions by student, displaying each student with all the courses they are detained in. Students whose overall attendance is **75% or more** are excluded.
 
 ### 📝 Microsoft Word (.docx) Generator
 - Programmatically constructs OpenXML Word files.
@@ -165,6 +165,7 @@ attendance-system/
         *   Loops over normalized student records.
         *   If `overallPct < 75`, adds them to **Table I**.
         *   If `60 <= overallPct < 75` AND the student's seat number is present in the `condonationSeats` Set, adds them to **Table II**.
+        *   Students with `overallPct >= 75` are skipped for Table III entirely.
         *   Loops over all subjects. If a subject's score is `< 60`, adds the entry to **Table III(A)** (course-wise list) and also aggregates this under the student's name in **Table III(B)** (student-wise list).
     *   Calculates total metadata stats (number of detained courses, students, and tables).
 

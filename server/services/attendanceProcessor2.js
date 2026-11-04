@@ -118,6 +118,13 @@ function processAttendanceY2(students, subjectNames, condonationSeats = new Set(
       });
     }
 
+    // ── Table III — exempt students with overall >= 75% ──────────────────────
+    // A student whose overall attendance is 75% or more must not appear in
+    // Table III(A) or Table III(B), even if an individual course is below 60%.
+    if (overall !== null && overall >= OVERALL_THRESHOLD) {
+      continue;
+    }
+
     // ── Table III – per-subject detention with avg rule ──────────────────────
     // Collect ALL subject percentages (including those >= 60%) to apply avg rule
     const allCourseData = {}; // code → { code, fullName, theoryPct, practicalPct }

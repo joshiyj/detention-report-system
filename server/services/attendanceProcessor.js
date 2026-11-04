@@ -99,7 +99,7 @@ function processAttendance(students, subjectNames, condonationSeats = new Set(),
   // Table I: overall < 75%
   const tableI = [];
 
-  // Table II: 60 <= overall <= 75 AND has pouring attendance in at least one subject
+  // Table II: 60 <= overall < 75 AND has pouring attendance in at least one subject
   const tableII = [];
 
   // Table III(A): course-wise – key = course code only.
@@ -127,7 +127,7 @@ function processAttendance(students, subjectNames, condonationSeats = new Set(),
     if (
       overall !== null &&
       overall >= CONDONATION_MIN &&
-      overall <= OVERALL_THRESHOLD &&
+      overall < OVERALL_THRESHOLD &&
       s.hasPouringAttendance
     ) {
       tableII.push({
@@ -136,6 +136,13 @@ function processAttendance(students, subjectNames, condonationSeats = new Set(),
         name:    s.name,
         overall: overall.toFixed(2),
       });
+    }
+
+    // ── Table III — exempt students with overall >= 75% ──────────────────────
+    // A student whose overall attendance is 75% or more must not appear in
+    // Table III(A) or Table III(B), even if an individual course is below 60%.
+    if (overall !== null && overall >= OVERALL_THRESHOLD) {
+      continue;
     }
 
     // ── Table III – course detention with avg rule ────────────────────────────

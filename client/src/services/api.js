@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API = axios.create({ baseURL: '/api' });
+const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || '';
+const API = axios.create({ baseURL: `${BACKEND_URL}/api` });
 
 export async function generateReport(formData) {
   const { data } = await API.post('/generate', formData, {
@@ -45,6 +46,6 @@ export async function generateReportBMED3(formData) {
 }
 
 export function getDownloadUrl(filename) {
-  return `/api/download/${filename}`;
+  return `${BACKEND_URL}/api/download/${filename}`;
 }
 

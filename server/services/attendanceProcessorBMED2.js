@@ -107,6 +107,13 @@ function processAttendanceBMED2(students, subjectNames, condonationSeats = new S
       });
     }
 
+    // ── Table III — exempt students with overall >= 75% ──────────────────────
+    // A student whose overall attendance is 75% or more must not appear in
+    // Table III(A) or Table III(B), even if an individual course is below 60%.
+    if (overall !== null && overall >= OVERALL_THRESHOLD) {
+      continue;
+    }
+
     // ── Table III — per-subject detention ─────────────────────────────────────
     // Blank cells (null) = not enrolled → skip
     const allCourseData = {}; // code → { code, fullName, sn, theoryPct, practicalPct }
