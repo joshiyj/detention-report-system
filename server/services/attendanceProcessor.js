@@ -145,10 +145,7 @@ function processAttendance(students, subjectNames, condonationSeats = new Set(),
       continue;
     }
 
-    // ── Table III – course detention with avg rule ────────────────────────────
-    // IMPORTANT: Collect ALL subject pct values per course (including those >= 60%)
-    // so that the avg rule can be applied correctly even when only one component is
-    // individually below 60% but the average of both puts it above the threshold.
+    // ── Table III – course detention (component < 60%) ────────────────────────
     const allCourseData = {}; // code → { code, fullName, theoryPct, practicalPct }
     for (const subj of subjectNames) {
       const pct = s.subjects[subj];
@@ -161,34 +158,20 @@ function processAttendance(students, subjectNames, condonationSeats = new Set(),
       else                   allCourseData[code].practicalPct = pct;
     }
 
-    // Determine which courses are truly detained after applying the avg rule
-    // Result: detainedCourses[code] → { code, fullName, theoryPct, practicalPct }
-    //   where theoryPct/practicalPct are the detained component values (raw numbers)
-    const detainedCourses = {}; // courses that survive the avg filter
+    // Determine which courses are detained: any component (Theory or Practical) < 60%
+    const detainedCourses = {};
 
     for (const cd of Object.values(allCourseData)) {
-      const hasBoth = cd.theoryPct !== null && cd.practicalPct !== null;
+      const theoryDetained = cd.theoryPct !== null && cd.theoryPct < SUBJECT_THRESHOLD;
+      const practicalDetained = cd.practicalPct !== null && cd.practicalPct < SUBJECT_THRESHOLD;
 
-      if (hasBoth) {
-        // Both Theory AND Practical columns exist for this student/course
-        // → apply avg rule: detained only if avg < 60%
-        const avg = (cd.theoryPct + cd.practicalPct) / 2;
-        if (avg < SUBJECT_THRESHOLD) {
-          detainedCourses[cd.code] = {
-            code: cd.code, fullName: cd.fullName,
-            theoryPct: cd.theoryPct, practicalPct: cd.practicalPct,
-          };
-        }
-        // avg >= 60: skip entirely (not detained)
-      } else {
-        // Only one component — apply individual threshold
-        const singlePct = cd.theoryPct ?? cd.practicalPct;
-        if (singlePct < SUBJECT_THRESHOLD) {
-          detainedCourses[cd.code] = {
-            code: cd.code, fullName: cd.fullName,
-            theoryPct: cd.theoryPct, practicalPct: cd.practicalPct,
-          };
-        }
+      if (theoryDetained || practicalDetained) {
+        detainedCourses[cd.code] = {
+          code: cd.code,
+          fullName: cd.fullName,
+          theoryPct: theoryDetained ? cd.theoryPct : null,
+          practicalPct: practicalDetained ? cd.practicalPct : null,
+        };
       }
     }
 
@@ -241,14 +224,6 @@ function processAttendance(students, subjectNames, condonationSeats = new Set(),
       code:     c.code,
       fullName: c.fullName,
       rows: Object.values(c.studentMap)
-        // If both Theory & Practical exist, exclude when their average >= 60%
-        .filter(s => {
-          if (s.theoryPct !== null && s.practicalPct !== null) {
-            const avg = (parseFloat(s.theoryPct) + parseFloat(s.practicalPct)) / 2;
-            return avg < SUBJECT_THRESHOLD;
-          }
-          return true;
-        })
         .map(s => ({
           rollNo: s.rollNo,
           seatNo: s.seatNo,
@@ -264,7 +239,7 @@ function processAttendance(students, subjectNames, condonationSeats = new Set(),
                : `${s.theoryPct ?? s.practicalPct} %`,
         })),
     }))
-    // Drop courses that have no student rows remaining after the avg filter
+    // Drop courses that have no student rows remaining
     .filter(c => c.rows.length > 0)
     .sort((a, b) => shortformCodeIndex(a.code, activeShortformOrder) - shortformCodeIndex(b.code, activeShortformOrder));
 
