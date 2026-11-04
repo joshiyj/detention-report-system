@@ -158,7 +158,9 @@ function processAttendance(students, subjectNames, condonationSeats = new Set(),
       else                   allCourseData[code].practicalPct = pct;
     }
 
-    // Determine which courses are detained: any component (Theory or Practical) < 60%
+    // Determine which courses are detained:
+    // If a student is detained in theory (<60%), they are also detained in practical, and vice versa.
+    // Both theory and practical percentages are retained so they appear side-by-side in one row.
     const detainedCourses = {};
 
     for (const cd of Object.values(allCourseData)) {
@@ -169,8 +171,8 @@ function processAttendance(students, subjectNames, condonationSeats = new Set(),
         detainedCourses[cd.code] = {
           code: cd.code,
           fullName: cd.fullName,
-          theoryPct: theoryDetained ? cd.theoryPct : null,
-          practicalPct: practicalDetained ? cd.practicalPct : null,
+          theoryPct: cd.theoryPct,
+          practicalPct: cd.practicalPct,
         };
       }
     }

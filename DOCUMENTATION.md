@@ -166,7 +166,7 @@ attendance-system/
         *   If `overallPct < 75`, adds them to **Table I**.
         *   If `60 <= overallPct < 75` AND the student's seat number is present in the `condonationSeats` Set, adds them to **Table II**.
         *   Students with `overallPct >= 75` are skipped for Table III entirely.
-        *   Loops over all subjects. If a subject's score is `< 60`, adds the entry to **Table III(A)** (course-wise list) and also aggregates this under the student's name in **Table III(B)** (student-wise list).
+        *   Loops over all subjects. If either component (Theory or Practical) is `< 60%`, the student is detained in both components for that course, displayed side-by-side in a single row (`Theory/Practical` with `T%/P%`). Added to **Table III(A)** and **Table III(B)**.
     *   Calculates total metadata stats (number of detained courses, students, and tables).
 
 #### 10. [server/services/wordGenerator.js](file:///c:/Users/lalit/OneDrive/Desktop/Projects/attendance-system/server/services/wordGenerator.js)
