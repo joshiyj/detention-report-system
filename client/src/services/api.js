@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || '';
+const BACKEND_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? '' : 'https://detention-report-system.onrender.com');
 const API = axios.create({ baseURL: `${BACKEND_URL}/api` });
 
 export async function generateReport(formData) {
@@ -48,4 +50,3 @@ export async function generateReportBMED3(formData) {
 export function getDownloadUrl(filename) {
   return `${BACKEND_URL}/api/download/${filename}`;
 }
-
